@@ -138,11 +138,11 @@ class weed_datasets(data.Dataset):
 
         with open(image_files) as f:
             image_file = f.readlines()
-            self.images = [k.rstrip('\n') for k in image_file]  
+            self.images = [os.path.join(root, k.rstrip('\n')) for k in image_file]  
 
         with open(mask_files) as f:
             mask_file = f.readlines()
-            self.masks = [k.rstrip('\n') for k in mask_file]  
+            self.masks = [os.path.join(root, k.rstrip('\n')) for k in mask_file]  
 
         assert (len(self.images) == len(self.masks))
 
@@ -153,7 +153,8 @@ class weed_datasets(data.Dataset):
         Returns:
             tuple: (image, target) where target is the image segmentation.
         """
-        img = Image.open(self.images[index]).convert('RGB')
+        #img = Image.open(self.images[index]).convert('RGB')
+        img = Image.open(self.images[index])
         target = Image.open(self.masks[index])
         if self.transform is not None:
             img, target = self.transform(img, target)

@@ -4,7 +4,8 @@ from .backbone import (
     resnet,
     mobilenetv2,
     hrnetv2,
-    xception
+    xception,
+    segnet
 )
 
 def _segm_hrnet(name, backbone_name, num_classes, pretrained_backbone):
@@ -28,6 +29,14 @@ def _segm_hrnet(name, backbone_name, num_classes, pretrained_backbone):
     backbone = IntermediateLayerGetter(backbone, return_layers=return_layers, hrnet_flag=True)
     model = DeepLabV3(backbone, classifier)
     return model
+
+def _segm_segnet(name, backbone_name, num_classes, pretrained_backbone):
+
+    #backbone = resnet.__dict__[backbone_name](
+     #   pretrained=pretrained_backbone)
+    model = segnet.SegNet()
+    return model
+
 
 def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
 
@@ -122,7 +131,13 @@ def _load_model(arch_type, backbone, num_classes, output_stride, pretrained_back
     else:
         raise NotImplementedError
     return model
+def _load_model_segnet(arch_type, backbone, num_classes):
 
+    if backbone=='resnet50':
+        model = _segm_segnet(arch_type, backbone, num_classes, pretrained_backbone=True)
+    else:
+        raise NotImplementedError
+    return model
 
 # Deeplab v3
 def deeplabv3_hrnetv2_48(num_classes=21, output_stride=4, pretrained_backbone=False): # no pretrained backbone yet
@@ -170,6 +185,11 @@ def deeplabv3_xception(num_classes=21, output_stride=8, pretrained_backbone=True
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
     return _load_model('deeplabv3', 'xception', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+
+# SegNet
+
+def segnet_50(num_classes=3,output_stride = 9):
+    return _load_model_segnet("segnet", "resnet50", num_classes)
 
 
 # Deeplab v3+
