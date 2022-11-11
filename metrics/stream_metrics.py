@@ -38,9 +38,10 @@ class StreamSegMetrics(_StreamMetrics):
     def to_str(results):
         string = "\n"
         for k, v in results.items():
-            if k!="Class IoU":
+            if k!="Class IoU" and k!="Class f1score":
                 string += "%s: %f\n"%(k, v)
-        
+            else:
+                print(k,v)
         #string+='Class IoU:\n'
         #for k, v in results['Class IoU'].items():
         #    string += "\tclass %d: %f\n"%(k, v)
@@ -64,19 +65,25 @@ class StreamSegMetrics(_StreamMetrics):
         hist = self.confusion_matrix
         acc = np.diag(hist).sum() / hist.sum()
         acc_cls = np.diag(hist) / hist.sum(axis=1)
-        acc_cls = np.nanmean(acc_cls)
+
+        recall_cls = np.diag(hist) / hist.sum(axis=0)
+        acc_cls_mean = np.nanmean(acc_cls)
         iu = np.diag(hist) / (hist.sum(axis=1) + hist.sum(axis=0) - np.diag(hist))
         mean_iu = np.nanmean(iu)
         freq = hist.sum(axis=1) / hist.sum()
         fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
         cls_iu = dict(zip(range(self.n_classes), iu))
+        f1_score = 2*(recall_cls*acc_cls)/(recall_cls+acc_cls)
 
         return {
                 "Overall Acc": acc,
-                "Mean Acc": acc_cls,
+                "Mean Acc": acc_cls_mean,
                 "FreqW Acc": fwavacc,
                 "Mean IoU": mean_iu,
                 "Class IoU": cls_iu,
+              #  "Class precision": acc_cls,
+              #  "Class recall":recall_cls,
+                "Class f1score":f1_score
             }
         
     def reset(self):

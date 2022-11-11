@@ -7,7 +7,7 @@ import argparse
 import numpy as np
 
 from torch.utils import data
-from datasets import VOCSegmentation, Cityscapes
+from datasets import VOCSegmentation, Cityscapes, weed_datasets
 from utils import ext_transforms as et
 from metrics import StreamSegMetrics
 
@@ -27,7 +27,7 @@ def get_argparser():
     parser.add_argument("--data_root", type=str, default='./datasets/data',
                         help="path to Dataset")
     parser.add_argument("--dataset", type=str, default='voc',
-                        choices=['voc', 'cityscapes'], help='Name of dataset')
+                        choices=['voc', 'cityscapes','custom'], help='Name of dataset')
     parser.add_argument("--num_classes", type=int, default=None,
                         help="num classes (default: None)")
 
@@ -36,7 +36,7 @@ def get_argparser():
                               not (name.startswith("__") or name.startswith('_')) and callable(
                               network.modeling.__dict__[name])
                               )
-    parser.add_argument("--model", type=str, default='deeplabv3plus_mobilenet',
+    parser.add_argument("--model", type=str, default='deeplabv3plus_resnet50',
                         choices=available_models, help='model name')
     parser.add_argument("--separable_conv", action='store_true', default=False,
                         help="apply separable conv to decoder and aspp")
@@ -44,7 +44,7 @@ def get_argparser():
 
     # Train Options
     parser.add_argument("--test_only", action='store_true', default=False)
-    parser.add_argument("--save_val_results", action='store_true', default=False,
+    parser.add_argument("--save_val_results", action='store_true', default=True,
                         help="save segmentation results to \"./results\"")
     parser.add_argument("--total_itrs", type=int, default=30e3,
                         help="epoch number (default: 30k)")
@@ -55,7 +55,7 @@ def get_argparser():
     parser.add_argument("--step_size", type=int, default=10000)
     parser.add_argument("--crop_val", action='store_true', default=False,
                         help='crop validation (default: False)')
-    parser.add_argument("--batch_size", type=int, default=16,
+    parser.add_argument("--batch_size", type=int, default=4,
                         help='batch size (default: 16)')
     parser.add_argument("--val_batch_size", type=int, default=4,
                         help='batch size for validation (default: 4)')
@@ -75,7 +75,7 @@ def get_argparser():
                         help="random seed (default: 1)")
     parser.add_argument("--print_interval", type=int, default=10,
                         help="print interval of loss (default: 10)")
-    parser.add_argument("--val_interval", type=int, default=100,
+    parser.add_argument("--val_interval", type=int, default=1000,
                         help="epoch interval for eval (default: 100)")
     parser.add_argument("--download", action='store_true', default=False,
                         help="download datasets")
@@ -150,6 +150,30 @@ def get_dataset(opts):
                                split='train', transform=train_transform)
         val_dst = Cityscapes(root=opts.data_root,
                              split='val', transform=val_transform)
+    if opts.dataset == 'custom':
+        train_transform = et.ExtCompose([
+            et.ExtResize(  (1008,1465) ),
+            #et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size)),
+            et.ExtColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
+            et.ExtRandomHorizontalFlip(),
+            et.ExtToTensor(),
+            et.ExtNormalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225]),
+        ])
+
+        val_transform = et.ExtCompose([
+            # et.ExtResize( 512 ),
+            et.ExtResize(  (1008,1465) ),
+            et.ExtToTensor(),
+            et.ExtNormalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225]),
+        ])
+
+        train_dst = weed_datasets(root=opts.data_root,
+                               split='train', transform=train_transform)
+        val_dst = weed_datasets(root=opts.data_root,
+                             split='val', transform=val_transform)
+
     return train_dst, val_dst
 
 
@@ -269,7 +293,10 @@ def main():
     if opts.loss_type == 'focal_loss':
         criterion = utils.FocalLoss(ignore_index=255, size_average=True)
     elif opts.loss_type == 'cross_entropy':
-        criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
+
+        class_weight = [0.9173, 1.0, 2.3365]
+        class_weight=torch.tensor(class_weight,dtype=torch.float,device= device)
+        criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean', weight=class_weight)
 
     def save_ckpt(path):
         """ save current model
@@ -348,7 +375,7 @@ def main():
                 interval_loss = 0.0
 
             if (cur_itrs) % opts.val_interval == 0:
-                save_ckpt('checkpoints/latest_%s_%s_os%d.pth' %
+                save_ckpt('checkpoints/2latest_%s_%s_os%d.pth' %
                           (opts.model, opts.dataset, opts.output_stride))
                 print("validation...")
                 model.eval()
@@ -358,7 +385,7 @@ def main():
                 print(metrics.to_str(val_score))
                 if val_score['Mean IoU'] > best_score:  # save best model
                     best_score = val_score['Mean IoU']
-                    save_ckpt('checkpoints/best_%s_%s_os%d.pth' %
+                    save_ckpt('checkpoints/2best_%s_%s_os%d.pth' %
                               (opts.model, opts.dataset, opts.output_stride))
 
                 if vis is not None:  # visualize validation score and samples

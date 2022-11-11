@@ -1,4 +1,5 @@
 import collections
+from configparser import Interpolation
 import torchvision
 import torch
 import torchvision.transforms.functional as F
@@ -92,7 +93,7 @@ class ExtCenterCrop(object):
 
 
 class ExtRandomScale(object):
-    def __init__(self, scale_range, interpolation=Image.BILINEAR):
+    def __init__(self, scale_range, interpolation=F.InterpolationMode.BILINEAR):
         self.scale_range = scale_range
         self.interpolation = interpolation
 
@@ -108,7 +109,7 @@ class ExtRandomScale(object):
         assert img.size == lbl.size
         scale = random.uniform(self.scale_range[0], self.scale_range[1])
         target_size = ( int(img.size[1]*scale), int(img.size[0]*scale) )
-        return F.resize(img, target_size, self.interpolation), F.resize(lbl, target_size, Image.NEAREST)
+        return F.resize(img, target_size, self.interpolation), F.resize(lbl, target_size,  F.InterpolationMode.NEAREST)
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -122,7 +123,7 @@ class ExtScale(object):
             ``PIL.Image.BILINEAR``
     """
 
-    def __init__(self, scale, interpolation=Image.BILINEAR):
+    def __init__(self, scale, interpolation=F.InterpolationMode.BILINEAR):
         self.scale = scale
         self.interpolation = interpolation
 
@@ -137,7 +138,7 @@ class ExtScale(object):
         """
         assert img.size == lbl.size
         target_size = ( int(img.size[1]*self.scale), int(img.size[0]*self.scale) ) # (H, W)
-        return F.resize(img, target_size, self.interpolation), F.resize(lbl, target_size, Image.NEAREST)
+        return F.resize(img, target_size, self.interpolation), F.resize(lbl, target_size, F.InterpolationMode.NEAREST)
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -408,8 +409,10 @@ class ExtResize(object):
             ``PIL.Image.BILINEAR``
     """
 
-    def __init__(self, size, interpolation=Image.BILINEAR):
+    def __init__(self, size, interpolation=F.InterpolationMode.BILINEAR):
         assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
+
+        
         self.size = size
         self.interpolation = interpolation
 
@@ -420,7 +423,7 @@ class ExtResize(object):
         Returns:
             PIL Image: Rescaled image.
         """
-        return F.resize(img, self.size, self.interpolation), F.resize(lbl, self.size, Image.NEAREST)
+        return F.resize(img, self.size, self.interpolation), F.resize(lbl, self.size, F.InterpolationMode.NEAREST)
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
